@@ -5,7 +5,7 @@ from Network import BrainNet
 from Loss import *
 from NeuralODE import *
 from Utils import *
-
+import Visuals
 import matplotlib.pyplot as plt
 
 
@@ -15,13 +15,9 @@ def main(config):
     moving = load_nii(config.moving)
     assert fixed.shape == moving.shape  # two images to be registered must in the same size
     # Plot moving and fixed as a 2d image
-    plt.figure()
-    plt.title('Fixed')
-    plt.imshow(moving)
-    plt.figure()
-    plt.title('Moving')
-    plt.imshow(fixed)
-    plt.show()
+    Visuals.plot_image(moving, 'Moving Image')
+    Visuals.plot_image(fixed, 'Fixed Image')
+
     t = time.time()
     df, df_with_grid, warped_moving = registration(config, device, moving, fixed)
     runtime = time.time() - t
@@ -31,7 +27,6 @@ def main(config):
     print('---Evaluation DONE---')
     save_result(config, df, warped_moving)
     print('---Results Saved---')
-
 
 def registration(config, device, moving, fixed):
     '''
@@ -126,7 +121,16 @@ def evaluation(config, device, df, df_with_grid):
 
 
 def save_result(config, df, warped_moving):
-    save_nii(df.permute(2, 3, 0, 1).detach().cpu().numpy(), '%s/df.nii.gz' % (config.savepath))
+    new_df = df.permute(2, 3, 0, 1).detach().cpu().numpy()
+    # Plot the deformation field
+    plt.figure()
+    plt.imshow(new_df[:, :, 0, 0])
+    plt.savefig('%s/df_x.png' % (config.savepath))
+    plt.figure()
+    plt.imshow(new_df[:, :, 0, 1])
+    plt.savefig('%s/df_y.png' % (config.savepath))
+
+    save_nii(new_df, '%s/df.nii.gz' % (config.savepath))
     save_nii(warped_moving.detach().cpu().numpy(), '%s/warped.nii.gz' % (config.savepath))
 
 
