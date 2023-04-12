@@ -122,16 +122,13 @@ def evaluation(config, device, df, df_with_grid):
 
 def save_result(config, df, warped_moving):
     new_df = df.permute(2, 3, 0, 1).detach().cpu().numpy()
-    # Plot the deformation field
-    plt.figure()
-    plt.imshow(new_df[:, :, 0, 0])
-    plt.savefig('%s/df_x.png' % (config.savepath))
-    plt.figure()
-    plt.imshow(new_df[:, :, 0, 1])
-    plt.savefig('%s/df_y.png' % (config.savepath))
 
     save_nii(new_df, '%s/df.nii.gz' % (config.savepath))
-    save_nii(warped_moving.detach().cpu().numpy(), '%s/warped.nii.gz' % (config.savepath))
+    warped_moving_np = warped_moving.detach().cpu().numpy()
+    save_nii(warped_moving_np, '%s/warped.nii.gz' % (config.savepath))
+    Visuals.plot_image(warped_moving_np, "Warped Moving Image")
+
+
 
 
 if __name__ == '__main__':
