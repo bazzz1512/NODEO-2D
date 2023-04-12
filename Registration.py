@@ -6,12 +6,22 @@ from Loss import *
 from NeuralODE import *
 from Utils import *
 
+import matplotlib.pyplot as plt
+
 
 def main(config):
     device = torch.device(config.device)
     fixed = load_nii(config.fixed)
     moving = load_nii(config.moving)
     assert fixed.shape == moving.shape  # two images to be registered must in the same size
+    # Plot moving and fixed as a 2d image
+    plt.figure()
+    plt.title('Fixed')
+    plt.imshow(moving)
+    plt.figure()
+    plt.title('Moving')
+    plt.imshow(fixed)
+    plt.show()
     t = time.time()
     df, df_with_grid, warped_moving = registration(config, device, moving, fixed)
     runtime = time.time() - t
@@ -198,3 +208,4 @@ if __name__ == '__main__':
     if not os.path.isdir(config.savepath):
         os.makedirs(config.savepath)
     main(config)
+    plt.show()
