@@ -110,7 +110,9 @@ def neg_Jdet_loss(J):
     Jdet = JacboianDet(J)
     neg_Jdet = -1.0 * (Jdet - 0.5)
     selected_neg_Jdet = F.relu(neg_Jdet)
-    return torch.mean(selected_neg_Jdet ** 2)
+    return_val = torch.mean(selected_neg_Jdet ** 2)
+    # return torch.zeros_like(return_val)
+    return return_val
 
 
 def smoothloss_loss(df):
