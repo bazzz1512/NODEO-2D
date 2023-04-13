@@ -35,9 +35,11 @@ def main(config):
 
     # Plot the jacobian determinants of the deformation field
     jdet = Loss.JacboianDet(df_with_grid)
-    plt.figure(dpi=600)
     Visuals.plot_image(jdet.cpu().numpy()[0, :, :], "Jacobian Determinant")
-    plt.show()
+
+    # Only keep negative jacobian determinants - do with pytorch
+    jdet_neg_elements = jdet.clamp(max=0).square()
+    Visuals.plot_image(jdet_neg_elements.cpu().numpy()[0, :, :], "Negative Jacobian Determinant")
 
     print('---Evaluation DONE---')
     # Plot the deformation field
