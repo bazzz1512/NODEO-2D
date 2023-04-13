@@ -24,9 +24,18 @@ def main(config):
     print('Registration Running Time:', runtime)
     print('---Registration DONE---')
     evaluation(config, device, df, df_with_grid)
+    df_with_grid_np = df_with_grid.cpu().numpy()
+    # Plot the 2D deformation field
+
+    plt.figure(dpi=600)
+    Visuals.plot_grid(df_with_grid_np[0, :, :, 0], df_with_grid_np[0, :, :, 1])
+    plt.show()
+
     print('---Evaluation DONE---')
+    # Plot the deformation field
     save_result(config, df, warped_moving)
     print('---Results Saved---')
+
 
 def registration(config, device, moving, fixed):
     '''
@@ -127,8 +136,6 @@ def save_result(config, df, warped_moving):
     warped_moving_np = warped_moving.detach().cpu().numpy()
     save_nii(warped_moving_np, '%s/warped.nii.gz' % (config.savepath))
     Visuals.plot_image(warped_moving_np, "Warped Moving Image")
-
-
 
 
 if __name__ == '__main__':
