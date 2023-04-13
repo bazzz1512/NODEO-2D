@@ -1,6 +1,8 @@
 import argparse
 import os
 import time
+
+import Loss
 from Network import BrainNet
 from Loss import *
 from NeuralODE import *
@@ -25,10 +27,16 @@ def main(config):
     print('---Registration DONE---')
     evaluation(config, device, df, df_with_grid)
     df_with_grid_np = df_with_grid.cpu().numpy()
-    # Plot the 2D deformation field
 
+    # Plot the 2D deformation field
     plt.figure(dpi=600)
     Visuals.plot_grid(df_with_grid_np[0, :, :, 0], df_with_grid_np[0, :, :, 1])
+    plt.show()
+
+    # Plot the jacobian determinants of the deformation field
+    jdet = Loss.JacboianDet(df_with_grid)
+    plt.figure(dpi=600)
+    Visuals.plot_image(jdet.cpu().numpy()[0, :, :], "Jacobian Determinant")
     plt.show()
 
     print('---Evaluation DONE---')

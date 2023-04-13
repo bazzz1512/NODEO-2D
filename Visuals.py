@@ -4,7 +4,7 @@ from matplotlib.collections import LineCollection
 
 
 
-def plot_image(image, title):
+def plot_image(image, title=""):
     plt.figure()
     plt.title(title)
     plt.imshow(image)
