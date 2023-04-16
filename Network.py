@@ -105,7 +105,7 @@ class BrainNet(ODEF):
         self.bottleneck_sz = int(
             math.ceil(img_sz[0] / pow(2, self.ds)) * math.ceil(img_sz[1] / pow(2, self.ds)) * math.ceil(
                 img_sz[2] / pow(2, self.ds)))
-        self.lin1 = nn.Linear(864, self.bs, bias=bias)
+        self.lin1 = nn.Linear(6720, self.bs, bias=bias)
         self.lin2 = nn.Linear(self.bs, self.bottleneck_sz * 3, bias=bias)
         self.relu = nn.ReLU()
 
@@ -116,12 +116,11 @@ class BrainNet(ODEF):
             self.sk = GaussianKernel(win=smoothing_win, nsig=0.1)
 
     def forward(self, x):
-
         imgx = self.img_sz[0]
         imgy = self.img_sz[1]
         imgz = self.img_sz[2]
         # x = self.relu(self.enc_conv1(x))
-        x = F.interpolate(x, scale_factor=0.5, mode='trilinear')  # Optional to downsample the image
+        # x = F.interpolate(x, scale_factor=0.5, mode='trilinear', align_corners=False)  # Optional to downsample the image
         x = self.relu(self.enc_conv2(x))
         x = self.relu(self.enc_conv3(x))
         x = self.relu(self.enc_conv4(x))
@@ -133,7 +132,7 @@ class BrainNet(ODEF):
         x = x.view(1, 3, int(math.ceil(imgx / pow(2, self.ds))), int(math.ceil(imgy / pow(2, self.ds))),
                    int(math.ceil(imgz / pow(2, self.ds))))
         for _ in range(self.ds):
-            x = F.upsample(x, scale_factor=2, mode='trilinear')
+            x = F.interpolate(x, scale_factor=2, mode='trilinear', align_corners=False)
         # Apply Gaussian/Averaging smoothing
         for _ in range(self.smoothing_pass):
             if self.smoothing_kernel == 'AK':
@@ -143,4 +142,5 @@ class BrainNet(ODEF):
                 x_y = self.sk(x[:, 1, :, :, :].unsqueeze(1))
                 x_z = self.sk(x[:, 2, :, :, :].unsqueeze(1))
                 x = torch.cat([x_x, x_y, x_z], 1)
+        
         return x

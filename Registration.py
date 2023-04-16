@@ -1,6 +1,9 @@
 import argparse
 import os
 import time
+
+import numpy as np
+
 from Network import BrainNet
 from Loss import *
 from NeuralODE import *
@@ -8,19 +11,54 @@ from Utils import *
 
 
 def main(config):
-    device = torch.device(config.device)
-    fixed = load_nii(config.fixed)
-    moving = load_nii(config.moving)
-    assert fixed.shape == moving.shape  # two images to be registered must in the same size
-    t = time.time()
-    df, df_with_grid, warped_moving = registration(config, device, moving, fixed)
-    runtime = time.time() - t
-    print('Registration Running Time:', runtime)
-    print('---Registration DONE---')
-    evaluation(config, device, df, df_with_grid)
-    print('---Evaluation DONE---')
-    save_result(config, df, warped_moving)
-    print('---Results Saved---')
+    start_time = time.time()
+    # Initialize results
+    dices = []
+    neg_J_totals = []
+    neg_J_ratios = []
+
+    # Define the combinations of fixed and moving images used
+    range_fixed = [1, 10, 20, 30, 40]
+    # Subjects 8, 24, 36, and 48 do not exist in the dataset, so account for this
+    range_moving = [i for i in range(1, 50) if i not in range_fixed + [8, 24, 36, 48]]
+    # Total is 200 combinations
+    for idx_fixed, i_fixed in enumerate(range_fixed):
+        for idx_moving, i_moving in enumerate(range_moving):
+            # Include progress and time indicator
+            progress = (idx_fixed * len(range_moving) + idx_moving) / (
+                        len(range_moving) * len(range_fixed)) * 100  # Percentage
+            print(
+                f"Time passed: {round(((time.time() - start_time) / 60) // 60)}h{round(((time.time() - start_time) / 60) % 60)}m,  progress: {round(progress, 2)}%\n")
+
+            print(f"\nProcessing fixed image {i_fixed} and moving image {i_moving}:\n")
+
+            device = torch.device(config.device)
+            fixed = load_nii(f"./data/OASIS_OAS1_00{i_fixed:02d}_MR1/aligned_norm.nii.gz")
+            moving = load_nii(f"./data/OASIS_OAS1_00{i_moving:02d}_MR1/aligned_norm.nii.gz")
+            assert fixed.shape == moving.shape  # two images to be registered must in the same size
+            t = time.time()
+            df, df_with_grid, warped_moving = registration(config, device, moving, fixed)
+            runtime = time.time() - t
+            print('Registration Running Time:', runtime)
+            print('---Registration DONE---')
+            # Pass location of fixed and moving seg to evaluation function
+            avg_dice, mean_neg_J, ratio_neg_J = evaluation(config, device, df, df_with_grid,
+                                                           f"./data/OASIS_OAS1_00{i_fixed:02d}_MR1/aligned_seg35.nii.gz",
+                                                           f"./data/OASIS_OAS1_00{i_moving:02d}_MR1/aligned_seg35.nii.gz")
+            dices.append(avg_dice)
+            neg_J_totals.append(mean_neg_J)
+            neg_J_ratios.append(ratio_neg_J)
+            print('---Evaluation DONE---')
+            save_result(config, df, warped_moving)
+            print('---Results Saved---')
+            print("Dices:", dices)
+            print("Neg J sums:", neg_J_totals)
+            print("Neg J ratios:", neg_J_ratios)
+            print(f"Avg dice: {np.mean(dices)}, std. dev: {np.std(dices)}")
+            print(f"Avg sum: {np.mean(neg_J_totals)}, avg ratio: {np.mean(neg_J_ratios)}")
+    print("FINISHED!")
+    print("Dices:", dices)
+    print(f"Avg dice: {np.mean(dices)}, std. dev: {np.std(dices)}")
 
 
 def registration(config, device, moving, fixed):
@@ -80,7 +118,7 @@ def registration(config, device, moving, fixed):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        if (i + 1) % 20 == 0:
+        if (i + 1) % 100 == 0:
             print("Iteration: {0} Loss_sim: {1:.3e} loss_J: {2:.3e}".format(i + 1, loss_sim.item(), loss_J.item()))
         # pick the one df with the most balance loss_sim and loss_J in the last 50 epoches
         if i > config.epoches - 50:
@@ -92,7 +130,7 @@ def registration(config, device, moving, fixed):
     return best_df, best_df_with_grid, best_warped_moving
 
 
-def evaluation(config, device, df, df_with_grid):
+def evaluation(config, device, df, df_with_grid, fixed_seg, moving_seg):
     ### Calculate Neg Jac Ratio
     neg_Jet = -1.0 * JacboianDet(df_with_grid)
     neg_Jet = F.relu(neg_Jet)
@@ -104,8 +142,8 @@ def evaluation(config, device, df, df_with_grid):
     print('Ratio of neg Jet: ', ratio_neg_J)
     ### Calculate Dice
     label = [2, 3, 4, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 24, 28, 41, 42, 43, 46, 47, 49, 50, 51, 52, 53, 54, 60]
-    fixed_seg = load_nii(config.fixed_seg)
-    moving_seg = load_nii(config.moving_seg)
+    fixed_seg = load_nii(fixed_seg)
+    moving_seg = load_nii(moving_seg)
     ST_seg = SpatialTransformer(fixed_seg.shape, mode='nearest').to(device)
     moving_seg = torch.from_numpy(moving_seg).to(device).float()
     # make batch dimension
@@ -113,6 +151,7 @@ def evaluation(config, device, df, df_with_grid):
     warped_seg = ST_seg(moving_seg, df, return_phi=False)
     dice_move2fix = dice(warped_seg.unsqueeze(0).unsqueeze(0).detach().cpu().numpy(), fixed_seg, label)
     print('Avg. dice on %d structures: ' % len(label), np.mean(dice_move2fix[0]))
+    return np.mean(dice_move2fix[0]), mean_neg_J, ratio_neg_J
 
 
 def save_result(config, df, warped_moving):
@@ -127,16 +166,16 @@ if __name__ == '__main__':
                         dest="savepath", default='./result',
                         help="path for saving results")
     parser.add_argument("--fixed", type=str,
-                        dest="fixed", default='./data/OASIS_OAS1_0001_MR1/slice_orig.nii.gz',
+                        dest="fixed", default='./data/OASIS_OAS1_0001_MR1/aligned_norm.nii.gz',
                         help="fixed image data path")
     parser.add_argument("--moving", type=str,
-                        dest="moving", default='./data/OASIS_OAS1_0002_MR1/slice_orig.nii.gz',
+                        dest="moving", default='./data/OASIS_OAS1_0002_MR1/aligned_norm.nii.gz',
                         help="moving image data path")
     parser.add_argument("--fixed_seg", type=str,
-                        dest="fixed_seg", default='./data/OASIS_OAS1_OAS1_0001_MR1/brain_aseg.nii.gz',
+                        dest="fixed_seg", default='./data/OASIS_OAS1_0001_MR1/aligned_seg35.nii.gz',
                         help="fixed image segmentation data path")
     parser.add_argument("--moving_seg", type=str,
-                        dest="moving_seg", default='./data/OASIS_OAS1_OAS1_0002_MR1/brain_aseg.nii.gz',
+                        dest="moving_seg", default='./data/OASIS_OAS1_0002_MR1/aligned_seg35.nii.gz',
                         help="moving image segmentation data path")
     # Model configuration
     parser.add_argument("--ds", type=int,
