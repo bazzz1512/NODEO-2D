@@ -58,6 +58,9 @@ def main(config):
             print(f"Avg sum: {np.mean(neg_J_totals)}, avg ratio: {np.mean(neg_J_ratios)}")
     print("FINISHED!")
     print("Dices:", dices)
+    print("Neg J sums:", neg_J_totals)
+    print("Neg J ratios:", neg_J_ratios)
+    print(f"Avg sum: {np.mean(neg_J_totals)}, avg ratio: {np.mean(neg_J_ratios)}")
     print(f"Avg dice: {np.mean(dices)}, std. dev: {np.std(dices)}")
 
 
